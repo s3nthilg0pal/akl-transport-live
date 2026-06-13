@@ -82,9 +82,8 @@ select {
   height: 100%;
 }
 
-.map-recenter {
+.map-control {
   position: absolute;
-  bottom: 8rem;
   right: 1rem;
   z-index: 1000;
   width: 2.2rem;
@@ -101,8 +100,16 @@ select {
   place-items: center;
 }
 
-.map-recenter:hover {
+.map-control:hover {
   background: #fef9c3;
+}
+
+.map-recenter {
+  bottom: 8rem;
+}
+
+.map-control:not(.map-recenter) {
+  bottom: 10.8rem;
 }
 
 .map-legend {
@@ -119,52 +126,6 @@ select {
   background: rgba(255, 250, 240, 0.92);
   box-shadow: 0 0.75rem 2rem rgba(34, 37, 43, 0.16);
   backdrop-filter: blur(10px);
-}
-
-.map-legend-section {
-  display: flex;
-  gap: 0.4rem;
-  margin-bottom: 0.2rem;
-}
-
-.map-legend-layer {
-  flex: 1;
-  padding: 0.2rem 0.5rem;
-  border: 1.5px solid var(--ink);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  cursor: pointer;
-  opacity: 0.5;
-}
-
-.map-legend-layer.active {
-  background: var(--ink);
-  color: var(--paper, #f8f1df);
-  opacity: 1;
-}
-
-.map-legend-swatch-ferry {
-  border-radius: 50%;
-  width: 0.75rem;
-  height: 0.75rem;
-}
-
-.ferry-marker-shell {
-  background: transparent;
-  border: 0;
-}
-
-.ferry-marker {
-  width: 20px;
-  height: 20px;
-  border: 3px solid var(--ink, #22252b);
-  border-radius: 50%;
-  background: #0c9cb2;
-  box-shadow: 0 3px 0 rgba(34, 37, 43, 0.18);
 }
 
 .map-legend-item {
@@ -295,19 +256,6 @@ select {
   }
 }
 
-/* ── Theme toggle pill ───────────────────────────────────────────────────── */
-
-.map-pill-theme {
-  left: auto;
-  right: 1rem;
-  top: 3.6rem;
-  cursor: pointer;
-  font-size: 1rem;
-  letter-spacing: 0;
-  text-transform: none;
-  padding: 0.4rem 0.65rem;
-}
-
 /* ── Dark mode ───────────────────────────────────────────────────────────── */
 
 .dark {
@@ -324,8 +272,7 @@ select {
   border-color: var(--ink);
 }
 
-.dark .map-pill-theme:hover,
-.dark .map-recenter:hover {
+.dark .map-control:hover {
   background: #353840;
 }
 
@@ -358,7 +305,7 @@ select {
   border-color: var(--ink);
 }
 
-.dark .map-recenter {
+.dark .map-control {
   background: #2a2d35;
   border-color: rgba(226, 221, 210, 0.4);
   color: var(--ink);

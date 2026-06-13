@@ -2,8 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { fetchGtfsStops, fetchRealtimeFeed, fetchShapeForTrip, fetchTransitRouteIds, fetchTripUpdates } from "./atClient.js";
-import { extractFerryRouteIds, extractNextStopsByTripId, extractTrainRouteIds, normalizeVehicleFeed, parseRouteIds } from "./normalize.js";
+import { fetchGtfsStops, fetchRealtimeFeed, fetchShapeForTrip, fetchTrainRouteIds, fetchTripUpdates } from "./atClient.js";
+import { extractNextStopsByTripId, extractTrainRouteIds, normalizeVehicleFeed, parseRouteIds } from "./normalize.js";
 
 const app = express();
 const port = Number(process.env.PORT ?? 5174);
@@ -11,34 +11,6 @@ const staticDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
-});
-
-app.get("/api/debug/feed", async (_req, res) => {
-  const subscriptionKey = process.env.AT_SUBSCRIPTION_KEY;
-  const realtimeEndpoint = process.env.AT_REALTIME_ENDPOINT;
-
-  if (!subscriptionKey || !realtimeEndpoint) {
-    res.status(500).json({ error: "Missing AT_SUBSCRIPTION_KEY or AT_REALTIME_ENDPOINT" });
-    return;
-  }
-
-  try {
-    const feed = await fetchRealtimeFeed({ endpoint: realtimeEndpoint, subscriptionKey });
-    const routeCounts = new Map<string, number>();
-
-    for (const entity of feed.entity ?? []) {
-      const routeId = entity.vehicle?.trip?.route_id ?? "(none)";
-      routeCounts.set(routeId, (routeCounts.get(routeId) ?? 0) + 1);
-    }
-
-    const routes = [...routeCounts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([routeId, count]) => ({ routeId, count }));
-
-    res.json({ totalEntities: feed.entity?.length ?? 0, routes });
-  } catch (error) {
-    res.status(502).json({ error: error instanceof Error ? error.message : "Failed to fetch feed" });
-  }
 });
 
 app.get("/api/vehicles", async (_req, res) => {
@@ -79,22 +51,20 @@ app.get("/api/vehicles", async (_req, res) => {
         console.warn(error);
         return new Map<string, string>();
       }),
-      fetchTransitRouteIds({
+      fetchTrainRouteIds({
         endpoint: process.env.AT_GTFS_ROUTES_ENDPOINT,
         subscriptionKey,
-        extractTrain: extractTrainRouteIds,
-        extractFerry: extractFerryRouteIds
+        extract: extractTrainRouteIds
       }).catch((error: unknown) => {
         console.warn(error);
-        return { trainRouteIds: new Set<string>(), ferryRouteIds: new Set<string>(), hasRouteMetadata: false };
+        return { routeIds: new Set<string>(), hasRouteMetadata: false };
       })
     ]);
 
     const nextStopsByTripId = extractNextStopsByTripId(tripUpdates, stopNames);
 
     const payload = normalizeVehicleFeed(feed, {
-      trainRouteIds: routeMetadata.trainRouteIds,
-      ferryRouteIds: routeMetadata.ferryRouteIds,
+      trainRouteIds: routeMetadata.routeIds,
       hasRouteMetadata: routeMetadata.hasRouteMetadata,
       configuredRouteIds: parseRouteIds(process.env.TRAIN_ROUTE_IDS),
       nextStopsByTripId

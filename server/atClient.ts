@@ -13,8 +13,7 @@ const DEFAULT_GTFS_ZIP_URL = "https://gtfs.at.govt.nz/gtfs.zip";
 
 type RouteCache = {
   expiresAt: number;
-  trainRouteIds: Set<string>;
-  ferryRouteIds: Set<string>;
+  routeIds: Set<string>;
   hasRouteMetadata: boolean;
 };
 
@@ -63,22 +62,20 @@ export async function fetchTripUpdates(config: {
   return unwrapTripUpdatesFeed((await response.json()) as GtfsRealtimeTripUpdatesFeed | LegacyTripUpdatesResponse);
 }
 
-export async function fetchTransitRouteIds(config: {
+export async function fetchTrainRouteIds(config: {
   endpoint?: string;
   subscriptionKey: string;
-  extractTrain: (routes: JsonApiRoutesResponse) => Set<string>;
-  extractFerry: (routes: JsonApiRoutesResponse) => Set<string>;
-}): Promise<{ trainRouteIds: Set<string>; ferryRouteIds: Set<string>; hasRouteMetadata: boolean }> {
+  extract: (routes: JsonApiRoutesResponse) => Set<string>;
+}): Promise<{ routeIds: Set<string>; hasRouteMetadata: boolean }> {
   if (!config.endpoint) {
-    return { trainRouteIds: new Set(), ferryRouteIds: new Set(), hasRouteMetadata: false };
+    return { routeIds: new Set(), hasRouteMetadata: false };
   }
 
   const now = Date.now();
 
   if (routeCache && routeCache.expiresAt > now) {
     return {
-      trainRouteIds: routeCache.trainRouteIds,
-      ferryRouteIds: routeCache.ferryRouteIds,
+      routeIds: routeCache.routeIds,
       hasRouteMetadata: routeCache.hasRouteMetadata
     };
   }
@@ -95,16 +92,14 @@ export async function fetchTransitRouteIds(config: {
   }
 
   const json = (await response.json()) as JsonApiRoutesResponse;
-  const trainRouteIds = config.extractTrain(json);
-  const ferryRouteIds = config.extractFerry(json);
+  const routeIds = config.extract(json);
   routeCache = {
     expiresAt: now + ROUTE_CACHE_TTL_MS,
-    trainRouteIds,
-    ferryRouteIds,
+    routeIds,
     hasRouteMetadata: true
   };
 
-  return { trainRouteIds, ferryRouteIds, hasRouteMetadata: true };
+  return { routeIds, hasRouteMetadata: true };
 }
 
 export async function fetchGtfsStops(config: {

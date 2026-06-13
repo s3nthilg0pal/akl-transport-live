@@ -7,7 +7,6 @@ import type {
 } from "./types.js";
 
 const TRAIN_ROUTE_TYPE = 2;
-const FERRY_ROUTE_TYPE = 4;
 const AUCKLAND_RAIL_HINTS = [
   "east",
   "west",
@@ -18,7 +17,6 @@ const AUCKLAND_RAIL_HINTS = [
   "rail",
   "train"
 ];
-const AUCKLAND_FERRY_HINTS = ["ferry", "inner", "harbour", "waiheke", "devonport"];
 
 export function parseRouteIds(value: string | undefined): Set<string> {
   return new Set(
@@ -43,26 +41,11 @@ export function extractTrainRouteIds(routes: JsonApiRoutesResponse): Set<string>
   return ids;
 }
 
-export function extractFerryRouteIds(routes: JsonApiRoutesResponse): Set<string> {
-  const ids = new Set<string>();
-
-  for (const route of routes.data ?? []) {
-    const routeType = Number(route.attributes?.route_type);
-
-    if (route.id && routeType === FERRY_ROUTE_TYPE) {
-      ids.add(route.id);
-    }
-  }
-
-  return ids;
-}
-
 export function normalizeVehicleFeed(
   feed: GtfsRealtimeFeed,
   options: {
     now?: Date;
     trainRouteIds?: Set<string>;
-    ferryRouteIds?: Set<string>;
     hasRouteMetadata?: boolean;
     configuredRouteIds?: Set<string>;
     nextStopsByTripId?: Map<string, { stopId: string; stopName: string | null }>;
@@ -70,7 +53,6 @@ export function normalizeVehicleFeed(
 ): NormalizedVehicleResponse {
   const now = options.now ?? new Date();
   const trainRouteIds = options.trainRouteIds ?? new Set<string>();
-  const ferryRouteIds = options.ferryRouteIds ?? new Set<string>();
   const configuredRouteIds = options.configuredRouteIds ?? new Set<string>();
   const nextStopsByTripId = options.nextStopsByTripId ?? new Map();
   const filterMode = resolveFilterMode({
@@ -94,8 +76,9 @@ export function normalizeVehicleFeed(
 
       const routeId = vehicle.trip?.route_id ?? null;
 
-      const vehicleType = resolveVehicleType(routeId, filterMode, trainRouteIds, ferryRouteIds, configuredRouteIds);
-      if (!vehicleType) return null;
+      if (!isTrainRoute(routeId, filterMode, trainRouteIds, configuredRouteIds)) {
+        return null;
+      }
 
       const timestamp = parseUnixTimestamp(vehicle.timestamp);
       const vehicleId = vehicle.vehicle?.id ?? vehicle.vehicle?.label ?? entity.id ?? "unknown";
@@ -109,7 +92,6 @@ export function normalizeVehicleFeed(
         vehicleName,
         routeId,
         tripId,
-        vehicleType,
         nextStopId: nextStop?.stopId ?? null,
         nextStopName: nextStop?.stopName ?? null,
         latitude: position.latitude,
@@ -148,34 +130,6 @@ function resolveFilterMode(options: {
   }
 
   return "unfiltered";
-}
-
-function resolveVehicleType(
-  routeId: string | null,
-  filterMode: NormalizedVehicleResponse["filterMode"],
-  trainRouteIds: Set<string>,
-  ferryRouteIds: Set<string>,
-  configuredRouteIds: Set<string>
-): "train" | "ferry" | null {
-  if (filterMode === "gtfs-routes") {
-    if (routeId && trainRouteIds.has(routeId)) return "train";
-    if (routeId && ferryRouteIds.has(routeId)) return "ferry";
-    return null;
-  }
-
-  if (filterMode === "configured-routes") {
-    return routeId && configuredRouteIds.has(routeId) ? "train" : null;
-  }
-
-  if (filterMode === "route-heuristic") {
-    if (!routeId) return null;
-    const normalized = routeId.toLowerCase();
-    if (AUCKLAND_RAIL_HINTS.some((h) => normalized.includes(h))) return "train";
-    if (AUCKLAND_FERRY_HINTS.some((h) => normalized.includes(h))) return "ferry";
-    return null;
-  }
-
-  return "train";
 }
 
 function isTrainRoute(

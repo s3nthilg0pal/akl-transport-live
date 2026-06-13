@@ -20,9 +20,10 @@ type MetroLine = {
 type TrainMapProps = {
   vehicles: TrainVehicle[];
   darkMode: boolean;
+  onToggleDarkMode: () => void;
 };
 
-export function TrainMap({ vehicles, darkMode }: TrainMapProps) {
+export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
@@ -87,9 +88,7 @@ export function TrainMap({ vehicles, darkMode }: TrainMapProps) {
     for (const vehicle of vehicles) {
       nextIds.add(vehicle.id);
       const stale = vehicle.ageSeconds !== null && vehicle.ageSeconds > STALE_AFTER_SECONDS;
-      const icon = vehicle.vehicleType === "ferry"
-        ? ferryIcon(stale)
-        : trainIcon(vehicle.routeId, vehicle.bearing, stale);
+      const icon = trainIcon(vehicle.routeId, vehicle.bearing, stale);
       const content = popupHtml(vehicle, stale);
       const existing = markers.get(vehicle.id);
 
@@ -196,20 +195,14 @@ export function TrainMap({ vehicles, darkMode }: TrainMapProps) {
   return (
     <>
       <div ref={mapNodeRef} className="train-map" aria-label="Live Auckland train map" />
-      <button className="map-recenter" onClick={handleRecenter} aria-label="Re-centre map on Auckland">
+      <button className="map-control" onClick={onToggleDarkMode} aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}>
+        {darkMode ? "☀" : "☾"}
+      </button>
+      <button className="map-control map-recenter" onClick={handleRecenter} aria-label="Re-centre map on Auckland">
         ⊙
       </button>
     </>
   );
-}
-
-function ferryIcon(stale: boolean): L.DivIcon {
-  return L.divIcon({
-    className: "ferry-marker-shell",
-    html: `<div class="ferry-marker${stale ? " train-marker-stale" : ""}" aria-hidden="true"></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
-  });
 }
 
 function trainIcon(routeId: string | null, bearing: number | null, stale: boolean): L.DivIcon {

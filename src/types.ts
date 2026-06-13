@@ -4,7 +4,6 @@ export type TrainVehicle = {
   vehicleName: string | null;
   routeId: string | null;
   tripId: string | null;
-  vehicleType: "train" | "ferry";
   nextStopId: string | null;
   nextStopName: string | null;
   latitude: number;
