@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-server
+.env
+.git
+.gitignore
+coverage
+*.tsbuildinfo

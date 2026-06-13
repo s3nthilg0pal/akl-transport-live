@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: akl-train-map
+  labels:
+    app: akl-train-map
+spec:
+  type: LoadBalancer
+  selector:
+    app: akl-train-map
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP

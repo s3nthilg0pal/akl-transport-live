@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: akl-train-map
+
+resources:
+  - ../../base
+
+# Replace with your registry and tag, e.g. ghcr.io/you/akl-train-map:sha-abc1234
+images:
+  - name: akl-train-map
+    newName: akl-train-map
+    newTag: latest
+
+replicas:
+  - name: akl-train-map
+    count: 2
