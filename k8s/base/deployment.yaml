@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: akl-train-map
+  namespace: akl-train-map
   labels:
     app: akl-train-map
 spec:
