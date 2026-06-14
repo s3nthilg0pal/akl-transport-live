@@ -39,7 +39,7 @@ app.get("/api/vehicles", async (_req, res) => {
         subscriptionKey
       }),
       fetchTripUpdates({
-        endpoint: process.env.AT_TRIP_UPDATES_ENDPOINT ?? "https://api.at.govt.nz/realtime/legacy/tripupdates",
+        endpoint: process.env.AT_TRIP_UPDATES_ENDPOINT || "https://api.at.govt.nz/realtime/legacy/tripupdates",
         subscriptionKey
       }).catch((error: unknown) => {
         console.warn(error);

@@ -112,7 +112,7 @@ export async function fetchGtfsStops(config: {
     return stopCache.stops;
   }
 
-  const url = config.url ?? DEFAULT_GTFS_ZIP_URL;
+  const url = config.url || DEFAULT_GTFS_ZIP_URL;
   const response = await fetch(url, {
     headers: config.subscriptionKey
       ? {
