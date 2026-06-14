@@ -251,8 +251,7 @@ select {
   }
 
   .map-pill-updated {
-    left: auto;
-    right: 0.75rem;
+    display: none;
   }
 }
 

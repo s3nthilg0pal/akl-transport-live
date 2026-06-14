@@ -42,6 +42,7 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
   const lineLayerRef = useRef<L.LayerGroup | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
+  const markerClickHandlersRef = useRef<Map<string, L.LeafletEventHandlerFn>>(new Map());
   const markerAnimationsRef = useRef<Map<string, MarkerAnimation>>(new Map());
   const vehicleTimestampsRef = useRef<Map<string, number | null>>(new Map());
   const activeShapeRef = useRef<L.Polyline | null>(null);
@@ -86,6 +87,7 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
       lineLayerRef.current = null;
       markerLayerRef.current = null;
       markersRef.current.clear();
+      markerClickHandlersRef.current.clear();
       markerAnimationsRef.current.clear();
       vehicleTimestampsRef.current.clear();
       activeShapeRef.current = null;
@@ -112,21 +114,27 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
       const icon = trainIcon(vehicle.routeId, vehicle.bearing, stale);
       const content = popupHtml(vehicle, stale);
       const existing = markers.get(vehicle.id);
+      const clickHandler = () => handleTraceClick(vehicle);
 
       if (existing) {
         animateMarkerTo(vehicle, existing);
         existing.setIcon(icon);
         existing.setPopupContent(content);
-        existing.off("click");
-        existing.on("click", () => handleTraceClick(vehicle));
+        const previousClickHandler = markerClickHandlersRef.current.get(vehicle.id);
+        if (previousClickHandler) {
+          existing.off("click", previousClickHandler);
+        }
+        existing.on("click", clickHandler);
+        markerClickHandlersRef.current.set(vehicle.id, clickHandler);
         continue;
       }
 
       const marker = L.marker([vehicle.latitude, vehicle.longitude], { icon });
       marker.bindPopup(content);
-      marker.on("click", () => handleTraceClick(vehicle));
+      marker.on("click", clickHandler);
       marker.addTo(markerLayer);
       markers.set(vehicle.id, marker);
+      markerClickHandlersRef.current.set(vehicle.id, clickHandler);
       vehicleTimestampsRef.current.set(vehicle.id, vehicle.timestamp);
     }
 
@@ -138,6 +146,7 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
       stopMarkerAnimation(vehicleId);
       marker.remove();
       markers.delete(vehicleId);
+      markerClickHandlersRef.current.delete(vehicleId);
       vehicleTimestampsRef.current.delete(vehicleId);
     }
   }, [vehicles]);
