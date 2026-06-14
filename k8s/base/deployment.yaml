@@ -17,7 +17,8 @@ spec:
     spec:
       containers:
         - name: akl-train-map
-          image: akl-train-map:latest
+          image: ghcr.io/s3nthilg0pal/akl-transport-live:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
               name: http

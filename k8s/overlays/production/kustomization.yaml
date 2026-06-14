@@ -7,10 +7,9 @@ resources:
   - namespace.yaml
   - ../../base
 
-# Replace with your registry and tag, e.g. ghcr.io/you/akl-train-map:sha-abc1234
+# Replace tag with the exact SHA from the CI push, e.g. sha-abc1234
 images:
-  - name: akl-train-map
-    newName: akl-train-map
+  - name: ghcr.io/s3nthilg0pal/akl-transport-live
     newTag: latest
 
 replicas:
