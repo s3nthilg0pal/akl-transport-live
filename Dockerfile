@@ -29,4 +29,6 @@ EXPOSE 8080
 
 USER node
 
+ENV NODE_OPTIONS="--max-old-space-size=896"
+
 CMD ["node", "dist-server/index.js"]
