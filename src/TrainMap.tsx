@@ -4,6 +4,10 @@ import type { TrainVehicle } from "./types";
 
 const AUCKLAND: L.LatLngExpression = [-36.8485, 174.7633];
 const STALE_AFTER_SECONDS = 90;
+const DEFAULT_MOVE_MS = 3_000;
+const MIN_MOVE_MS = 750;
+const MAX_MOVE_MS = 30_000;
+const SNAP_DISTANCE_METERS = 5_000;
 
 function tileUrl(dark: boolean): string {
   return dark
@@ -23,6 +27,14 @@ type TrainMapProps = {
   onToggleDarkMode: () => void;
 };
 
+type MarkerAnimation = {
+  frameId: number | null;
+  from: L.LatLng;
+  to: L.LatLng;
+  startedAt: number;
+  durationMs: number;
+};
+
 export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps) {
   const mapNodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -30,6 +42,8 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
   const lineLayerRef = useRef<L.LayerGroup | null>(null);
   const markerLayerRef = useRef<L.LayerGroup | null>(null);
   const markersRef = useRef<Map<string, L.Marker>>(new Map());
+  const markerAnimationsRef = useRef<Map<string, MarkerAnimation>>(new Map());
+  const vehicleTimestampsRef = useRef<Map<string, number | null>>(new Map());
   const activeShapeRef = useRef<L.Polyline | null>(null);
   const activeTripIdRef = useRef<string | null>(null);
   const activeStopMarkersRef = useRef<L.CircleMarker[]>([]);
@@ -62,11 +76,18 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
     });
 
     return () => {
+      for (const animation of markerAnimationsRef.current.values()) {
+        if (animation.frameId !== null) {
+          window.cancelAnimationFrame(animation.frameId);
+        }
+      }
       map.remove();
       mapRef.current = null;
       lineLayerRef.current = null;
       markerLayerRef.current = null;
       markersRef.current.clear();
+      markerAnimationsRef.current.clear();
+      vehicleTimestampsRef.current.clear();
       activeShapeRef.current = null;
       activeTripIdRef.current = null;
       activeStopMarkersRef.current = [];
@@ -93,12 +114,11 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
       const existing = markers.get(vehicle.id);
 
       if (existing) {
-        existing.setLatLng([vehicle.latitude, vehicle.longitude]);
+        animateMarkerTo(vehicle, existing);
         existing.setIcon(icon);
         existing.setPopupContent(content);
-        if (activeFollowIdRef.current === vehicle.id) {
-          mapRef.current?.panTo([vehicle.latitude, vehicle.longitude]);
-        }
+        existing.off("click");
+        existing.on("click", () => handleTraceClick(vehicle));
         continue;
       }
 
@@ -107,6 +127,7 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
       marker.on("click", () => handleTraceClick(vehicle));
       marker.addTo(markerLayer);
       markers.set(vehicle.id, marker);
+      vehicleTimestampsRef.current.set(vehicle.id, vehicle.timestamp);
     }
 
     for (const [vehicleId, marker] of markers) {
@@ -114,10 +135,90 @@ export function TrainMap({ vehicles, darkMode, onToggleDarkMode }: TrainMapProps
         continue;
       }
 
+      stopMarkerAnimation(vehicleId);
       marker.remove();
       markers.delete(vehicleId);
+      vehicleTimestampsRef.current.delete(vehicleId);
     }
   }, [vehicles]);
+
+  function animateMarkerTo(vehicle: TrainVehicle, marker: L.Marker) {
+    const destination = L.latLng(vehicle.latitude, vehicle.longitude);
+    const current = marker.getLatLng();
+    const previousTimestamp = vehicleTimestampsRef.current.get(vehicle.id) ?? null;
+    const runningAnimation = markerAnimationsRef.current.get(vehicle.id);
+
+    if (previousTimestamp === vehicle.timestamp && runningAnimation?.to.equals(destination)) {
+      return;
+    }
+
+    if (!runningAnimation && current.equals(destination)) {
+      vehicleTimestampsRef.current.set(vehicle.id, vehicle.timestamp);
+      return;
+    }
+
+    const durationMs = movementDurationMs(previousTimestamp, vehicle.timestamp);
+
+    vehicleTimestampsRef.current.set(vehicle.id, vehicle.timestamp);
+
+    if (current.distanceTo(destination) > SNAP_DISTANCE_METERS || durationMs <= 0) {
+      stopMarkerAnimation(vehicle.id);
+      marker.setLatLng(destination);
+      panFollowedMarker(vehicle.id, destination);
+      return;
+    }
+
+    stopMarkerAnimation(vehicle.id);
+
+    const animation: MarkerAnimation = {
+      frameId: null,
+      from: current,
+      to: destination,
+      startedAt: performance.now(),
+      durationMs
+    };
+
+    const step = (now: number) => {
+      const elapsed = now - animation.startedAt;
+      const progress = Math.min(elapsed / animation.durationMs, 1);
+      const eased = easeInOutCubic(progress);
+      const next = L.latLng(
+        animation.from.lat + (animation.to.lat - animation.from.lat) * eased,
+        animation.from.lng + (animation.to.lng - animation.from.lng) * eased
+      );
+
+      marker.setLatLng(next);
+      panFollowedMarker(vehicle.id, next);
+
+      if (progress < 1) {
+        animation.frameId = window.requestAnimationFrame(step);
+        return;
+      }
+
+      markerAnimationsRef.current.delete(vehicle.id);
+    };
+
+    animation.frameId = window.requestAnimationFrame(step);
+    markerAnimationsRef.current.set(vehicle.id, animation);
+  }
+
+  function stopMarkerAnimation(vehicleId: string) {
+    const animation = markerAnimationsRef.current.get(vehicleId);
+    if (!animation) {
+      return;
+    }
+
+    if (animation.frameId !== null) {
+      window.cancelAnimationFrame(animation.frameId);
+    }
+    markerAnimationsRef.current.delete(vehicleId);
+  }
+
+  function panFollowedMarker(vehicleId: string, latLng: L.LatLng) {
+    if (activeFollowIdRef.current === vehicleId) {
+      mapRef.current?.panTo(latLng, { animate: false });
+    }
+  }
 
   function clearActiveShape() {
     activeShapeRef.current?.remove();
@@ -238,6 +339,24 @@ function routeColor(routeId: string | null): string {
   }
 
   return "#1c7ed6";
+}
+
+function movementDurationMs(previousTimestamp: number | null, nextTimestamp: number | null): number {
+  if (previousTimestamp !== null && nextTimestamp !== null && nextTimestamp > previousTimestamp) {
+    return clamp((nextTimestamp - previousTimestamp) * 1_000, MIN_MOVE_MS, MAX_MOVE_MS);
+  }
+
+  return DEFAULT_MOVE_MS;
+}
+
+function easeInOutCubic(progress: number): number {
+  return progress < 0.5
+    ? 4 * progress * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 function popupHtml(vehicle: TrainVehicle, stale: boolean): string {
